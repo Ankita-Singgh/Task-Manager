@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <meta charset="UTF-8">
+  <title>Task Manager</title>
+
+  <style>
+
+body{
+font-family:Arial;
+margin:0;
+background:#72c291;
+transition:0.3s;
+}
+
+.dark{
+background:#1e1e2f;
+color:white;
+}
+
+/* NAVBAR */
+
+.navbar{
+background:#0c9905;
+color:white;
+padding:15px 30px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+font-size:22px;
+}
+
+/* CONTAINER */
+
+.container{
+max-width:900px;
+margin:auto;
+padding:30px;
+}
+
+/* INPUT AREA */
+
+.input-area{
+display:flex;
+gap:10px;
+margin-bottom:20px;
+}
+
+input{
+flex:1;
+padding:10px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+button{
+padding:10px 15px;
+border:none;
+border-radius:6px;
+background:#087565;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#0e6149;
+}
+
+/* STATS */
+
+.stats{
+display:flex;
+justify-content:space-between;
+margin:20px 0;
+}
+
+.stat{
+background:white;
+padding:12px 20px;
+border-radius:8px;
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
+}
+
+.dark .stat{
+background:#2d2d44;
+}
+
+/* PROGRESS */
+
+.progress{
+background:#ddd;
+height:10px;
+border-radius:5px;
+margin-bottom:20px;
+}
+
+.progress-bar{
+height:10px;
+background:#0c9905;
+border-radius:5px;
+width:0%;
+}
+
+/* FILTERS */
+
+.filters{
+margin-bottom:20px;
+}
+
+.filters button{
+margin-right:10px;
+}
+
+/* TASK */
+
+.task{
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:white;
+padding:12px;
+border-radius:8px;
+margin-bottom:10px;
+box-shadow:0 3px 10px rgba(0,0,0,0.05);
+}
+
+.dark .task{
+background:#2d2d44;
+}
+
+.completed{
+text-decoration:line-through;
+color:gray;
+}
+
+.delete{
+background:#db1818;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="navbar">
+
+  <div>📝 Task Manager</div>
+
+  <button onclick="toggleDark()">🌙 Dark Mode</button>
+
+</div>
+
+<div class="container">
+
+  <!-- ADD TASK -->
+
+  <div class="input-area">
+
+    <input id="taskInput" placeholder="Enter task...">
+
+    <button onclick="addTask()">➕ Add</button>
+
+  </div>
+
+  <!-- SEARCH -->
+
+  <input id="searchInput" placeholder="🔎 Search tasks..." onkeyup="loadTasks()">
+
+  <!-- STATS -->
+
+  <div class="stats">
+
+    <div class="stat">📋 Total: <span id="total">0</span></div>
+
+    <div class="stat">✔ Completed: <span id="completed">0</span></div>
+
+    <div class="stat">⏳ Pending: <span id="pending">0</span></div>
+
+  </div>
+
+  <!-- PROGRESS BAR -->
+
+  <div class="progress">
+    <div id="progressBar" class="progress-bar"></div>
+  </div>
+
+  <!-- FILTER -->
+
+  <div class="filters">
+
+    <button onclick="setFilter('all')">All</button>
+
+    <button onclick="setFilter('completed')">Completed</button>
+
+    <button onclick="setFilter('pending')">Pending</button>
+
+  </div>
+
+  <!-- TASK LIST -->
+
+  <div id="taskList"></div>
+
+</div>
+
+<script>
+
+const API="http://localhost:8081/tasks";
+
+let filter="all";
+
+function toggleDark(){
+document.body.classList.toggle("dark");
+}
+
+/* LOAD TASKS */
+
+async function loadTasks(){
+
+let res=await fetch(API);
+let tasks=await res.json();
+
+localStorage.setItem("tasks",JSON.stringify(tasks));
+
+displayTasks(tasks);
+
+}
+
+/* DISPLAY TASKS */
+
+function displayTasks(tasks){
+
+let list=document.getElementById("taskList");
+let search=document.getElementById("searchInput").value.toLowerCase();
+
+list.innerHTML="";
+
+let total=tasks.length;
+let completed=0;
+
+tasks.forEach(task=>{
+
+if(filter==="completed" && !task.completed) return;
+if(filter==="pending" && task.completed) return;
+
+if(!task.title.toLowerCase().includes(search)) return;
+
+if(task.completed) completed++;
+
+let div=document.createElement("div");
+
+div.className="task";
+
+div.innerHTML=`
+
+<span class="${task.completed?'completed':''}"
+onclick="toggleTask(${task.id},${task.completed},'${task.title}')">
+
+${task.completed?'✔️':'⬜'} ${task.title}
+
+</span>
+
+<button class="delete" onclick="deleteTask(${task.id})">❌</button>
+
+`;
+
+list.appendChild(div);
+
+});
+
+let pending=total-completed;
+
+document.getElementById("total").innerText=total;
+document.getElementById("completed").innerText=completed;
+document.getElementById("pending").innerText=pending;
+
+let progress=total===0?0:(completed/total)*100;
+
+document.getElementById("progressBar").style.width=progress+"%";
+
+}
+
+/* ADD TASK */
+
+async function addTask(){
+
+let input=document.getElementById("taskInput");
+
+if(input.value===""){
+alert("Enter task");
+return;
+}
+
+await fetch(API,{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+title:input.value,
+completed:false
+})
+});
+
+input.value="";
+
+loadTasks();
+
+}
+
+/* TOGGLE */
+
+async function toggleTask(id,completed,title){
+
+await fetch(API+"/"+id,{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+title:title,
+completed:!completed
+})
+});
+
+loadTasks();
+
+}
+
+/* DELETE */
+
+async function deleteTask(id){
+
+await fetch(API+"/"+id,{
+method:"DELETE"
+});
+
+loadTasks();
+
+}
+
+/* FILTER */
+
+function setFilter(type){
+filter=type;
+loadTasks();
+}
+
+/* OFFLINE MODE */
+
+window.addEventListener("offline",()=>{
+
+let tasks=JSON.parse(localStorage.getItem("tasks")) || [];
+
+displayTasks(tasks);
+
+alert("Offline mode: showing saved tasks");
+
+});
+
+/* INITIAL LOAD */
+
+loadTasks();
+
+</script>
+
+</body>
+</html>
